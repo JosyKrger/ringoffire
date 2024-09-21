@@ -9,6 +9,8 @@ import { DialogAddPlayerComponent } from '../dialog-add-player/dialog-add-player
 import { MatDialogModule } from '@angular/material/dialog';
 import { MatCardModule } from '@angular/material/card';
 import { GameInfoComponent } from '../game-info/game-info.component';
+import { Firestore, collectionData, collection, addDoc, DocumentReference, doc, docData, DocumentData, updateDoc } from '@angular/fire/firestore';
+import { ActivatedRoute, Router } from '@angular/router';
 
 @Component({
   selector: 'app-game',
@@ -22,49 +24,62 @@ import { GameInfoComponent } from '../game-info/game-info.component';
     MatDialogContent,
     MatCardModule,
     GameInfoComponent,
+    GameComponent
   ],
   templateUrl: './game.component.html',
   styleUrl: './game.component.scss'
 })
 export class GameComponent {
 
-  pickCardAnimation = false;
-  currentCard: string = '';
   game!: Game;
   animal!: string;
   name!: string;
 
+  gameId!: string;
 
-  constructor(
-    public dialog: MatDialog,
-  ) {
-    this.game = new Game();
-  }
+  constructor(private route: ActivatedRoute, private firestore: Firestore, public dialog: MatDialog, private router: Router) { }
 
 
   ngOnInit(): void {
+    this.newGame();
+
+    this.route.params.subscribe((params) => {
+      // console.log(params['id']);
+      this.gameId = params['id'];
+      const gameDocRef = doc(this.firestore, `games/${this.gameId}`);
+      docData(gameDocRef).subscribe((game: any) => {
+        console.log('Game update', game);
+        this.game.currentPlayer = game.currentPlayer;
+        this.game.playedCards = game.playedCards;
+        this.game.players = game.players;
+        this.game.stack = game.stack;
+        this.game.pickCardAnimation = game.pickCardAnimation;
+        this.game.currentCard = game.currentCard;
+      });
+    });
+
   }
 
 
   newGame() {
     this.game = new Game();
-    console.log(this.game);
   }
 
 
   takeCard() {
-    if (!this.pickCardAnimation) {
-      this.currentCard = this.game.stack.pop() || '';
-      console.log(this.currentCard);
-      this.pickCardAnimation = true;
-      console.log('New card: ' + this.currentCard);
+    if (!this.game.pickCardAnimation) {
+      this.game.currentCard = this.game.stack.pop() || '';
+      this.game.pickCardAnimation = true;
+      console.log('New card: ' + this.game.currentCard);
       console.log('Game is ', this.game);
 
       this.game.currentPlayer++;
       this.game.currentPlayer = this.game.currentPlayer % this.game.players.length;
+      this.saveGame();
       window.setTimeout(() => {
-        this.game.playedCards.push(this.currentCard);
-        this.pickCardAnimation = false;
+        this.game.playedCards.push(this.game.currentCard);
+        this.game.pickCardAnimation = false;
+        this.saveGame();
       }, 1000);
     }
   }
@@ -72,11 +87,23 @@ export class GameComponent {
 
   openDialog(): void {
     const dialogRef = this.dialog.open(DialogAddPlayerComponent);
-
     dialogRef.afterClosed().subscribe((name: string) => {
       if (name && name.length > 0) {
         this.game.players.push(name);
+        this.saveGame();
       }
     });
+  }
+
+
+  saveGame() {
+    const gameRef = doc(this.firestore, `games/${this.gameId}`); // Erstellt eine Dokumentreferenz
+    updateDoc(gameRef, this.game.toJson()) // Aktualisiert das Dokument mit den neuen Daten
+      .then(() => {
+        console.log('Game successfully updated!');
+      })
+      .catch((error) => {
+        console.error('Error updating game: ', error);
+      });
   }
 }

@@ -4,6 +4,9 @@
   <mat-form-field>
     <mat-label>Name</mat-label>
     <input matInput [(ngModel)]="name" required />
+    <mat-error *ngIf="name.length == 0">
+      Name cannot be empty.
+    </mat-error>
     <!--
       2. Variante
       <mat-error *ngIf="!isNameValid() && name.length > 0">
